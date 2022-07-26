@@ -98,24 +98,10 @@ func handleEventMessage(event slackevents.EventsAPIEvent, client *slack.Client) 
 }
 
 func handleSlashCommand(command slack.SlashCommand, client *slack.Client) (interface{}, error) {
-	// We need to switch depending on the command
-
-	result, err := client.GetUsers()
-	if err != nil {
-		println(err)
-	}
-
-	// bs, _ := json.Marshal(result)
-
-	for _, v := range result {
-		for k1, v1 := range v {
-			fmt.Println(k1, "value is", v1)
-		}
-	}
 
 	switch command.Command {
 	case "/acuso":
-		return nil, handleAcusoCommand(command, client)
+		return nil, handleAccuseCommand(command, client)
 		// case "/was-this-article-useful":
 		// 	return handleIsArticleGood(command, client)
 	}
@@ -123,9 +109,43 @@ func handleSlashCommand(command slack.SlashCommand, client *slack.Client) (inter
 	return nil, nil
 }
 
-func handleAcusoCommand(command slack.SlashCommand, client *slack.Client) error {
+func GetAccusedUser(command slack.SlashCommand, client *slack.Client) (*slack.User, error) {
+
+	// fmt.Println(userProfile)
+
+	// result, err := client.GetUsers()
+	// if err != nil {
+	// 	println(err)
+	// }
+
+	// for _, v := range result {
+	// 	if command.Text != nil {
+	// 		if strings.Contains(command.Text, v.ID) {
+	// 			if v.Profile.DisplayName != nil {
+
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// command.Text = "A quién acusas? Etiquétalo!"
+
+	return nil, nil
+}
+
+func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error {
 	// The Input is found in the text field so
 	// Create the attachment and assigned based on the message
+
+	// accused = GetAccusedUser(command slack.SlashCommand, client *slack.Client)
+	accusedUserID := strings.TrimLeft(strings.TrimRight(command.Text, "|"), "<@")
+
+	fmt.Println("======== ID =========", accusedUserID)
+
+	params := new(slack.GetUserProfileParameters)
+
+	userProfile, err := client.GetUserProfile(params{accusedUserID})
+
+	fmt.Println("======== ID =========", userProfile)
 
 	fmt.Println("\n \n +++++++++++++++++++ \n \n", command, "\n \n +++++++++++++++++++ \n \n")
 	attachment := slack.Attachment{}
@@ -143,10 +163,10 @@ func handleAcusoCommand(command slack.SlashCommand, client *slack.Client) error 
 		},
 	}
 
-	attachment.Text = fmt.Sprintf("Gracias por acusar %s : \n %s", command.UserName, command.Text)
+	attachment.Text = fmt.Sprintf("Gracias por acusar %s : \n %s", "@"+command.UserName, command.Text)
 	attachment.Color = "#4af030"
 
-	_, _, err := client.PostMessage(command.ChannelID, slack.MsgOptionAttachments(attachment))
+	_, _, err = client.PostMessage(command.ChannelID, slack.MsgOptionAttachments(attachment))
 	if err != nil {
 		return fmt.Errorf("failed to post message: %w", err)
 	}
@@ -154,7 +174,6 @@ func handleAcusoCommand(command slack.SlashCommand, client *slack.Client) error 
 }
 
 func handleAppMentionEvent(event *slackevents.AppMentionEvent, client *slack.Client) error {
-
 	user, err := client.GetUserInfo(event.User)
 	if err != nil {
 		return err
