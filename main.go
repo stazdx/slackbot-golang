@@ -137,34 +137,43 @@ func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error
 	// Create the attachment and assigned based on the message
 
 	// accused = GetAccusedUser(command slack.SlashCommand, client *slack.Client)
-	accusedUserID := strings.TrimLeft(strings.TrimRight(command.Text, "|"), "<@")
+	accusedUserID, found := GetUserIDByStrings(command.Text, "<@", "|")
+	if found == false {
+		return fmt.Errorf("Quieres acusar a alguien? Etiquétalo!")
+	}
 
-	fmt.Println("======== ID =========", accusedUserID)
+	fmt.Println("======== ID ========= \n", accusedUserID)
 
-	params := new(slack.GetUserProfileParameters)
+	userInfo, err := client.GetUserInfo(accusedUserID)
 
-	userProfile, err := client.GetUserProfile(params{accusedUserID})
-
-	fmt.Println("======== ID =========", userProfile)
+	fmt.Println("======== INFO ========= \n", userInfo)
 
 	fmt.Println("\n \n +++++++++++++++++++ \n \n", command, "\n \n +++++++++++++++++++ \n \n")
 	attachment := slack.Attachment{}
+
+	attachment.Title = ":rotating_light::rotating_light::rotating_light: ALERTA DE ACUSADO :rotating_light::rotating_light::rotating_light:"
+	// attachment.AuthorName = fmt.Sprintf("<@%s|%s>", command.UserID, command.UserName)
+	attachment.ImageURL = userInfo.Profile.Image512
+	// attachment.ThumbURL = userInfo.Profile.Image512
 	// Add Some default context like user who mentioned the bot
 	attachment.Fields = []slack.AttachmentField{
 		{
-			Title: "Usuario que acusa",
-			Value: command.UserName,
+			Title: ":squirrel: Usuario que acusa",
+			Value: fmt.Sprintf("<@%s|%s>", command.UserID, command.UserName),
 		}, {
-			Title: "Usuario acusado",
-			Value: "test",
+			Title: ":skull_and_crossbones: Usuario acusado",
+			Value: fmt.Sprintf("<@%s|%s>", userInfo.ID, userInfo.Name),
 		}, {
-			Title: "Fecha del crimen",
-			Value: time.Now().String(),
+			Title: ":memo: Declaración",
+			Value: command.Text,
+		}, {
+			Title: ":date: Fecha del delito",
+			Value: time.Now().Format("02-01-2020 15:04:05"),
 		},
 	}
 
-	attachment.Text = fmt.Sprintf("Gracias por acusar %s : \n %s", "@"+command.UserName, command.Text)
-	attachment.Color = "#4af030"
+	attachment.Text = fmt.Sprintf(":arrow_down: A continuación los detalles de la acusación:")
+	attachment.Color = "#B22222"
 
 	_, _, err = client.PostMessage(command.ChannelID, slack.MsgOptionAttachments(attachment))
 	if err != nil {
@@ -208,4 +217,19 @@ func handleAppMentionEvent(event *slackevents.AppMentionEvent, client *slack.Cli
 		return fmt.Errorf("failed to post message: %w", err)
 	}
 	return nil
+}
+
+func GetUserIDByStrings(str string, startS string, endS string) (result string, found bool) {
+	s := strings.Index(str, startS)
+	if s == -1 {
+		return result, false
+	}
+	newS := str[s+len(startS):]
+	e := strings.Index(newS, endS)
+	if e == -1 {
+		return result, false
+	}
+	result = newS[:e]
+
+	return result, true
 }
