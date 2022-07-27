@@ -71,6 +71,19 @@ func main() {
 					}
 					// Dont forget to acknowledge the request and send the payload
 					socketClient.Ack(*event.Request, payload)
+
+				case socketmode.EventTypeInteractive:
+					interaction, ok := event.Data.(slack.InteractionCallback)
+					if !ok {
+						log.Printf("Could not type cast the message to a Interaction callback: %v\n", interaction)
+						continue
+					}
+
+					err := handleInteractionEvent(interaction, client)
+					if err != nil {
+						log.Fatal(err)
+					}
+					socketClient.Ack(*event.Request)
 				}
 			}
 		}
@@ -102,6 +115,7 @@ func handleSlashCommand(command slack.SlashCommand, client *slack.Client) (inter
 	switch command.Command {
 	case "/acuso":
 		return nil, handleAccuseCommand(command, client)
+		// return handleIsArticleGood(command, client)
 		// case "/was-this-article-useful":
 		// 	return handleIsArticleGood(command, client)
 	}
@@ -109,27 +123,62 @@ func handleSlashCommand(command slack.SlashCommand, client *slack.Client) (inter
 	return nil, nil
 }
 
-func GetAccusedUser(command slack.SlashCommand, client *slack.Client) (*slack.User, error) {
+func handleIsArticleGood(command slack.SlashCommand, client *slack.Client) (interface{}, error) {
+	// Create the attachment and assigned based on the message
+	attachment := slack.Attachment{}
 
-	// fmt.Println(userProfile)
+	// Create the checkbox element
+	checkbox := slack.NewCheckboxGroupsBlockElement("answer",
+		slack.NewOptionBlockObject("yes", &slack.TextBlockObject{Text: "Yes", Type: slack.MarkdownType}, &slack.TextBlockObject{Text: "Did you Enjoy it?", Type: slack.MarkdownType}),
+		slack.NewOptionBlockObject("no", &slack.TextBlockObject{Text: "No", Type: slack.MarkdownType}, &slack.TextBlockObject{Text: "Did you Dislike it?", Type: slack.MarkdownType}),
+	)
+	// Create the Accessory that will be included in the Block and add the checkbox to it
+	accessory := slack.NewAccessory(checkbox)
+	// Add Blocks to the attachment
+	attachment.Blocks = slack.Blocks{
+		BlockSet: []slack.Block{
+			// Create a new section block element and add some text and the accessory to it
+			slack.NewSectionBlock(
+				&slack.TextBlockObject{
+					Type: slack.MarkdownType,
+					Text: "Did you think this article was helpful?",
+				},
+				nil,
+				accessory,
+			),
+		},
+	}
 
-	// result, err := client.GetUsers()
-	// if err != nil {
-	// 	println(err)
-	// }
+	attachment.Text = "Rate the tutorial"
+	attachment.Color = "#4af030"
+	return attachment, nil
+}
 
-	// for _, v := range result {
-	// 	if command.Text != nil {
-	// 		if strings.Contains(command.Text, v.ID) {
-	// 			if v.Profile.DisplayName != nil {
+func handleInteractionEvent(interaction slack.InteractionCallback, client *slack.Client) error {
+	// This is where we would handle the interaction
+	// Switch depending on the Type
+	log.Println(interaction)
+	log.Printf("The callbackID called is: %s\n", interaction.CallbackID)
+	log.Printf("The response was of type: %s\n", interaction.Type)
+	switch interaction.Type {
+	case slack.InteractionTypeBlockActions:
+		// This is a block action, so we need to handle it
 
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// command.Text = "A quién acusas? Etiquétalo!"
+		for _, action := range interaction.ActionCallback.BlockActions {
+			log.Printf("%+v", action)
+			log.Println("Selected option: ", action.SelectedOptions)
 
-	return nil, nil
+		}
+	case slack.InteractionTypeInteractionMessage:
+		switch interaction.CallbackID {
+		case "Penalize":
+			log.Println("Penalizar!")
+		case "Save":
+			log.Println("Inocente!")
+		}
+	default:
+	}
+	return nil
 }
 
 func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error {
@@ -154,8 +203,11 @@ func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error
 	attachment.Title = ":rotating_light::rotating_light::rotating_light: ALERTA DE ACUSADO :rotating_light::rotating_light::rotating_light:"
 	// attachment.AuthorName = fmt.Sprintf("<@%s|%s>", command.UserID, command.UserName)
 	attachment.ImageURL = userInfo.Profile.Image512
-	// attachment.ThumbURL = userInfo.Profile.Image512
-	// Add Some default context like user who mentioned the bot
+	attachment.ThumbURL = userInfo.Profile.Image512
+
+	attachment.Fallback = "Tú no tienes poderes aquí!"
+	attachment.CallbackID = "Penalize"
+
 	attachment.Fields = []slack.AttachmentField{
 		{
 			Title: ":squirrel: Usuario que acusa",
@@ -172,7 +224,24 @@ func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error
 		},
 	}
 
-	attachment.Text = fmt.Sprintf(":arrow_down: A continuación los detalles de la acusación:")
+	attachment.Actions = []slack.AttachmentAction{
+		{
+			Name:  "actionPenalize",
+			Text:  "Culpable",
+			Value: "Penalize",
+			Style: "danger",
+			Type:  "button",
+		},
+		{
+			Name:  "actionSave",
+			Text:  "Inocente",
+			Value: "Save",
+			Style: "default",
+			Type:  "button",
+		},
+	}
+
+	attachment.Text = fmt.Sprintf("A continuación los detalles de la acusación:")
 	attachment.Color = "#B22222"
 
 	_, _, err = client.PostMessage(command.ChannelID, slack.MsgOptionAttachments(attachment))
