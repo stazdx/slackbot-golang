@@ -155,27 +155,23 @@ func handleIsArticleGood(command slack.SlashCommand, client *slack.Client) (inte
 }
 
 func handleInteractionEvent(interaction slack.InteractionCallback, client *slack.Client) error {
-	// This is where we would handle the interaction
-	// Switch depending on the Type
-	log.Println(interaction)
-	log.Printf("The callbackID called is: %s\n", interaction.CallbackID)
-	log.Printf("The response was of type: %s\n", interaction.Type)
-	log.Printf("Action ID: %s\n", interaction.ActionID)
 	switch interaction.Type {
 	case slack.InteractionTypeBlockActions:
-		// This is a block action, so we need to handle it
-
 		for _, action := range interaction.ActionCallback.BlockActions {
 			log.Printf("%+v", action)
 			log.Println("Selected option: ", action.SelectedOptions)
 
 		}
 	case slack.InteractionTypeInteractionMessage:
-		switch interaction.ActionID {
-		case "Penalize":
-			log.Println("Penalizar!")
-		case "Save":
-			log.Println("Inocente!")
+		for _, action := range interaction.ActionCallback.AttachmentActions {
+			log.Printf("%+v", action)
+			log.Println("Action: ", action.Name)
+			switch action.Name {
+			case "actionPenalize":
+				log.Println("Penalizar!")
+			case "actionSave":
+				log.Println("Inocente!")
+			}
 		}
 	default:
 	}
@@ -232,15 +228,15 @@ func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error
 			Value: "Penalize",
 			Style: "danger",
 			Type:  "button",
-			Confirm: *slack.ConfirmationField{
-				Title:       "Ejecutar la acción",
-				Text:        "Después de esto no hay vuelta atrás :confused: !",
-				OkText:      "Sí",
-				DismissText: "No",
-			},
+			// Confirm: *slack.ConfirmationField{
+			// 	Title:       "Ejecutar la acción",
+			// 	Text:        "Después de esto no hay vuelta atrás :confused: !",
+			// 	OkText:      "Sí",
+			// 	DismissText: "No",
+			// },
 		},
 		{
-			Name:  "actionPenalize",
+			Name:  "actionSave",
 			Text:  "Inocente",
 			Value: "Save",
 			Style: "default",
