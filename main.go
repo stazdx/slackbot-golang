@@ -160,6 +160,7 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 	log.Println(interaction)
 	log.Printf("The callbackID called is: %s\n", interaction.CallbackID)
 	log.Printf("The response was of type: %s\n", interaction.Type)
+	log.Printf("Action ID: %s\n", interaction.ActionID)
 	switch interaction.Type {
 	case slack.InteractionTypeBlockActions:
 		// This is a block action, so we need to handle it
@@ -170,7 +171,7 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 
 		}
 	case slack.InteractionTypeInteractionMessage:
-		switch interaction.CallbackID {
+		switch interaction.ActionID {
 		case "Penalize":
 			log.Println("Penalizar!")
 		case "Save":
@@ -191,13 +192,13 @@ func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error
 		return fmt.Errorf("Quieres acusar a alguien? Etiquétalo!")
 	}
 
-	fmt.Println("======== ID ========= \n", accusedUserID)
+	// fmt.Println("======== ID ========= \n", accusedUserID)
 
 	userInfo, err := client.GetUserInfo(accusedUserID)
 
-	fmt.Println("======== INFO ========= \n", userInfo)
+	// fmt.Println("======== INFO ========= \n", userInfo)
 
-	fmt.Println("\n \n +++++++++++++++++++ \n \n", command, "\n \n +++++++++++++++++++ \n \n")
+	// fmt.Println("\n \n +++++++++++++++++++ \n \n", command, "\n \n +++++++++++++++++++ \n \n")
 	attachment := slack.Attachment{}
 
 	attachment.Title = ":rotating_light::rotating_light::rotating_light: ALERTA DE ACUSADO :rotating_light::rotating_light::rotating_light:"
@@ -231,9 +232,15 @@ func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error
 			Value: "Penalize",
 			Style: "danger",
 			Type:  "button",
+			Confirm: *slack.ConfirmationField{
+				Title:       "Ejecutar la acción",
+				Text:        "Después de esto no hay vuelta atrás :confused: !",
+				OkText:      "Sí",
+				DismissText: "No",
+			},
 		},
 		{
-			Name:  "actionSave",
+			Name:  "actionPenalize",
 			Text:  "Inocente",
 			Value: "Save",
 			Style: "default",
