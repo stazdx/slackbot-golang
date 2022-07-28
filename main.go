@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	badger "github.com/dgraph-io/badger/v3"
 	"github.com/joho/godotenv"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -33,6 +34,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	defer cancel()
+
+	db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer db.Close()
 
 	go func(ctx context.Context, client *slack.Client, socketClient *socketmode.Client) {
 		for {
@@ -79,7 +87,7 @@ func main() {
 						continue
 					}
 
-					err := handleInteractionEvent(interaction, client)
+					err := handleInteractionEvent(interaction, client, db)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -154,7 +162,7 @@ func handleIsArticleGood(command slack.SlashCommand, client *slack.Client) (inte
 	return attachment, nil
 }
 
-func handleInteractionEvent(interaction slack.InteractionCallback, client *slack.Client) error {
+func handleInteractionEvent(interaction slack.InteractionCallback, client *slack.Client, db *badger.DB) error {
 	switch interaction.Type {
 	case slack.InteractionTypeBlockActions:
 		for _, action := range interaction.ActionCallback.BlockActions {
@@ -168,8 +176,49 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 			log.Println("Action: ", action.Name)
 			switch action.Name {
 			case "actionPenalize":
+				err2 := db.Update(func(txn *badger.Txn) error {
+					e := badger.NewEntry([]byte("answer"), []byte("42"))
+					err2 := txn.SetEntry(e)
+					return err2
+				})
+				return err2
 				log.Println("Penalizar!")
 			case "actionSave":
+				err := db.View(func(txn *badger.Txn) error {
+					item, err := txn.Get([]byte("answer"))
+					log.Println(err)
+
+					var valNot, valCopy []byte
+					err2 := item.Value(func(val []byte) error {
+						// This func with val would only be called if item.Value encounters no error.
+
+						// Accessing val here is valid.
+						fmt.Println("The answer is: %s\n", val)
+
+						// Copying or parsing val is valid.
+						valCopy = append([]byte{}, val...)
+
+						// Assigning val slice to another variable is NOT OK.
+						valNot = val // Do not do this.
+						return nil
+					})
+					log.Println(err2)
+
+					// DO NOT access val here. It is the most common cause of bugs.
+					fmt.Printf("NEVER do this. %s\n", valNot)
+
+					// You must copy it to use it outside item.Value(...).
+					fmt.Printf("The answer is: %s\n", valCopy)
+
+					// Alternatively, you could also use item.ValueCopy().
+					valCopy, err = item.ValueCopy(nil)
+					log.Println(err)
+					fmt.Printf("The answer is: %s\n", valCopy)
+
+					return nil
+				})
+
+				return err
 				log.Println("Inocente!")
 			}
 		}
