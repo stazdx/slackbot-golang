@@ -177,7 +177,7 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 			switch action.Name {
 			case "actionPenalize":
 				err2 := db.Update(func(txn *badger.Txn) error {
-					e := badger.NewEntry([]byte("answer"), []byte("42"))
+					e := badger.NewEntry([]byte("answer3"), []byte("25")).WithMeta(byte(1))
 					err2 := txn.SetEntry(e)
 					return err2
 				})
@@ -185,11 +185,10 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 				log.Println("Penalizar!")
 			case "actionSave":
 				err := db.View(func(txn *badger.Txn) error {
-					item, err := txn.Get([]byte("answer"))
-					log.Println(err)
+					item, _ := txn.Get([]byte("answer"))
 
 					var valNot, valCopy []byte
-					err2 := item.Value(func(val []byte) error {
+					_ = item.Value(func(val []byte) error {
 						// This func with val would only be called if item.Value encounters no error.
 
 						// Accessing val here is valid.
@@ -202,7 +201,7 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 						valNot = val // Do not do this.
 						return nil
 					})
-					log.Println(err2)
+					// log.Println(err2)
 
 					// DO NOT access val here. It is the most common cause of bugs.
 					fmt.Printf("NEVER do this. %s\n", valNot)
@@ -211,8 +210,7 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 					fmt.Printf("The answer is: %s\n", valCopy)
 
 					// Alternatively, you could also use item.ValueCopy().
-					valCopy, err = item.ValueCopy(nil)
-					log.Println(err)
+					valCopy, _ = item.ValueCopy(nil)
 					fmt.Printf("The answer is: %s\n", valCopy)
 
 					return nil
