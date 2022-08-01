@@ -60,24 +60,21 @@ func main() {
 
 					err := handleEventMessage(eventsAPIEvent, client)
 					if err != nil {
-						// Replace with actual err handeling
 						log.Fatal(err)
 					}
 
 				case socketmode.EventTypeSlashCommand:
-					// Just like before, type cast to the correct event type, this time a SlashEvent
 					command, ok := event.Data.(slack.SlashCommand)
 					if !ok {
 						log.Printf("Could not type cast the message to a SlashCommand: %v\n", command)
 						continue
 					}
 
-					// handleSlashCommand will take care of the command
 					payload, err := handleSlashCommand(command, client)
 					if err != nil {
 						log.Fatal(err)
 					}
-					// Dont forget to acknowledge the request and send the payload
+
 					socketClient.Ack(*event.Request, payload)
 
 				case socketmode.EventTypeInteractive:
@@ -106,7 +103,6 @@ func handleEventMessage(event slackevents.EventsAPIEvent, client *slack.Client) 
 		innerEvent := event.InnerEvent
 		switch ev := innerEvent.Data.(type) {
 		case *slackevents.AppMentionEvent:
-			// log.Println(ev)
 			err := handleAppMentionEvent(ev, client)
 			if err != nil {
 				return err
@@ -132,20 +128,17 @@ func handleSlashCommand(command slack.SlashCommand, client *slack.Client) (inter
 }
 
 func handleIsArticleGood(command slack.SlashCommand, client *slack.Client) (interface{}, error) {
-	// Create the attachment and assigned based on the message
 	attachment := slack.Attachment{}
 
-	// Create the checkbox element
 	checkbox := slack.NewCheckboxGroupsBlockElement("answer",
 		slack.NewOptionBlockObject("yes", &slack.TextBlockObject{Text: "Yes", Type: slack.MarkdownType}, &slack.TextBlockObject{Text: "Did you Enjoy it?", Type: slack.MarkdownType}),
 		slack.NewOptionBlockObject("no", &slack.TextBlockObject{Text: "No", Type: slack.MarkdownType}, &slack.TextBlockObject{Text: "Did you Dislike it?", Type: slack.MarkdownType}),
 	)
-	// Create the Accessory that will be included in the Block and add the checkbox to it
+
 	accessory := slack.NewAccessory(checkbox)
-	// Add Blocks to the attachment
+
 	attachment.Blocks = slack.Blocks{
 		BlockSet: []slack.Block{
-			// Create a new section block element and add some text and the accessory to it
 			slack.NewSectionBlock(
 				&slack.TextBlockObject{
 					Type: slack.MarkdownType,
@@ -189,27 +182,16 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 
 					var valNot, valCopy []byte
 					_ = item.Value(func(val []byte) error {
-						// This func with val would only be called if item.Value encounters no error.
-
-						// Accessing val here is valid.
 						fmt.Println("The answer is: %s\n", val)
-
-						// Copying or parsing val is valid.
 						valCopy = append([]byte{}, val...)
-
-						// Assigning val slice to another variable is NOT OK.
 						valNot = val // Do not do this.
 						return nil
 					})
-					// log.Println(err2)
 
-					// DO NOT access val here. It is the most common cause of bugs.
 					fmt.Printf("NEVER do this. %s\n", valNot)
 
-					// You must copy it to use it outside item.Value(...).
 					fmt.Printf("The answer is: %s\n", valCopy)
 
-					// Alternatively, you could also use item.ValueCopy().
 					valCopy, _ = item.ValueCopy(nil)
 					fmt.Printf("The answer is: %s\n", valCopy)
 
@@ -226,26 +208,17 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 }
 
 func handleAccuseCommand(command slack.SlashCommand, client *slack.Client) error {
-	// The Input is found in the text field so
-	// Create the attachment and assigned based on the message
 
-	// accused = GetAccusedUser(command slack.SlashCommand, client *slack.Client)
 	accusedUserID, found := GetUserIDByStrings(command.Text, "<@", "|")
 	if found == false {
 		return fmt.Errorf("Quieres acusar a alguien? Etiquétalo!")
 	}
 
-	// fmt.Println("======== ID ========= \n", accusedUserID)
-
 	userInfo, err := client.GetUserInfo(accusedUserID)
 
-	// fmt.Println("======== INFO ========= \n", userInfo)
-
-	// fmt.Println("\n \n +++++++++++++++++++ \n \n", command, "\n \n +++++++++++++++++++ \n \n")
 	attachment := slack.Attachment{}
 
 	attachment.Title = ":rotating_light::rotating_light::rotating_light: ALERTA DE ACUSADO :rotating_light::rotating_light::rotating_light:"
-	// attachment.AuthorName = fmt.Sprintf("<@%s|%s>", command.UserID, command.UserName)
 	attachment.ImageURL = userInfo.Profile.Image512
 	attachment.ThumbURL = userInfo.Profile.Image512
 
@@ -306,8 +279,6 @@ func handleAppMentionEvent(event *slackevents.AppMentionEvent, client *slack.Cli
 	if err != nil {
 		return err
 	}
-
-	// fmt.Println("---------- \n", user, "---------- \n")
 
 	text := strings.ToLower(event.Text)
 
