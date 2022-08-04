@@ -1,6 +1,7 @@
 package main
 
 import (
+	"badger"
 	"context"
 	"errors"
 	"fmt"
@@ -9,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	badger "github.com/dgraph-io/badger/v3"
+	// badger "github.com/dgraph-io/badger/v3"
 	"github.com/joho/godotenv"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
