@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	badger "github.com/stazdx/slackbot-golang/utils"
-
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/joho/godotenv"
 	"github.com/slack-go/slack"
@@ -19,9 +17,6 @@ import (
 )
 
 func main() {
-
-	utils.Open(badger.DefaultOptions("/tmp/badger"))
-	os.Exit(3)
 	godotenv.Load(".env")
 
 	token := os.Getenv("SLACK_AUTH_TOKEN")
@@ -40,12 +35,16 @@ func main() {
 
 	defer cancel()
 
-	db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
+	// db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
+
+	db, err := Open("/tmp/badger")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer db.Close()
+	defer Close()
+
+	os.Exit(3)
 
 	go func(ctx context.Context, client *slack.Client, socketClient *socketmode.Client) {
 		for {
