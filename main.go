@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	badger "github.com/dgraph-io/badger/v3"
+	driver "github.com/arangodb/go-driver"
+	"github.com/arangodb/go-driver/http"
 	"github.com/joho/godotenv"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -22,7 +23,54 @@ func main() {
 	token := os.Getenv("SLACK_AUTH_TOKEN")
 	appToken := os.Getenv("SLACK_APP_TOKEN")
 
+	var err error
+	var dbclient driver.Client
+	var conn driver.Connection
+	var db driver.Database
+	var col driver.Collection
+
 	client := slack.New(token, slack.OptionDebug(true), slack.OptionAppLevelToken(appToken))
+
+	// Open a client connection
+	conn, err = http.NewConnection(http.ConnectionConfig{
+		Endpoints: []string{"https://5a812333269f.arangodb.cloud:8529/"},
+	})
+	if err != nil {
+		// Handle error
+	}
+
+	// Client object
+	dbclient, err = driver.NewClient(driver.ClientConfig{
+		Connection:     conn,
+		Authentication: driver.BasicAuthentication("root", "wnbGnPpCXHwbP"),
+	})
+	if err != nil {
+		// Handle error
+	}
+
+	// Open "examples_books" database
+	db, err3 := client.Database(nil, "examples_books")
+	if err3 != nil {
+		// Handle error
+	}
+
+	// Open "books" collection
+	col, err2 := db.Collection(nil, "books")
+	if err2 != nil {
+		// Handle error
+	}
+
+	// Create document
+	book := Book{
+		Title:   "ArangoDB Cookbook",
+		NoPages: 257,
+	}
+
+	meta, err := col.CreateDocument(nil, book)
+	if err != nil {
+		// Handle error
+	}
+	fmt.Printf("Created document in collection '%s' in database '%s'\n", col.Name(), db.Name())
 
 	socketClient := socketmode.New(
 		client,
@@ -35,13 +83,9 @@ func main() {
 
 	defer cancel()
 
-	db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
-
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	defer Close()
 
 	os.Exit(3)
 
@@ -158,7 +202,7 @@ func handleIsArticleGood(command slack.SlashCommand, client *slack.Client) (inte
 	return attachment, nil
 }
 
-func handleInteractionEvent(interaction slack.InteractionCallback, client *slack.Client, db *badger.DB) error {
+func handleInteractionEvent(interaction slack.InteractionCallback, client *slack.Client) error {
 	switch interaction.Type {
 	case slack.InteractionTypeBlockActions:
 		for _, action := range interaction.ActionCallback.BlockActions {
@@ -172,36 +216,9 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 			log.Println("Action: ", action.Name)
 			switch action.Name {
 			case "actionPenalize":
-				err2 := db.Update(func(txn *badger.Txn) error {
-					e := badger.NewEntry([]byte("answer3"), []byte("25")).WithMeta(byte(1))
-					err2 := txn.SetEntry(e)
-					return err2
-				})
 				return err2
 				log.Println("Penalizar!")
 			case "actionSave":
-				err := db.View(func(txn *badger.Txn) error {
-					item, _ := txn.Get([]byte("answer"))
-
-					var valNot, valCopy []byte
-					_ = item.Value(func(val []byte) error {
-						fmt.Println("The answer is: %s\n", val)
-						valCopy = append([]byte{}, val...)
-						valNot = val // Do not do this.
-						return nil
-					})
-
-					fmt.Printf("NEVER do this. %s\n", valNot)
-
-					fmt.Printf("The answer is: %s\n", valCopy)
-
-					valCopy, _ = item.ValueCopy(nil)
-					fmt.Printf("The answer is: %s\n", valCopy)
-
-					return nil
-				})
-
-				return err
 				log.Println("Inocente!")
 			}
 		}
@@ -326,167 +343,3 @@ func GetUserIDByStrings(str string, startS string, endS string) (result string, 
 
 	return result, true
 }
-
-// func Open(path string) (*badger.DB, error) {
-// 	if _, err := os.Stat(path); os.IsNotExist(err) {
-// 		os.MkdirAll(path, 0755)
-// 	}
-// 	opts := badger.DefaultOptions(path)
-// 	opts.Dir = path
-// 	opts.ValueDir = path
-// 	opts.SyncWrites = false
-// 	opts.ValueThreshold = 256
-// 	opts.CompactL0OnClose = true
-
-// 	// using memory
-// 	// opts := badger.DefaultOptions(path).WithInMemory(true)
-
-// 	db, err := badger.Open(opts)
-// 	if err != nil {
-// 		log.Println("badger open failed", "path", path, "err", err)
-// 		return nil, err
-// 	}
-// 	return db, nil
-// }
-
-// func Close() {
-// 	err := badger.Close()
-// 	if err == nil {
-// 		log.Println("database closed", "err", err)
-// 	} else {
-// 		log.Println("failed to close database", "err", err)
-// 	}
-// }
-
-// func Set(key []byte, value []byte) {
-// 	wb := badger.NewWriteBatch()
-// 	defer wb.Cancel()
-// 	err := wb.SetEntry(badger.NewEntry(key, value).WithMeta(0))
-// 	if err != nil {
-// 		log.Println("Failed to write data to cache.", "key", string(key), "value", string(value), "err", err)
-// 	}
-// 	err = wb.Flush()
-// 	if err != nil {
-// 		log.Println("Failed to flush data to cache.", "key", string(key), "value", string(value), "err", err)
-// 	}
-// }
-
-// func SetWithTTL(key []byte, value []byte, ttl int64) {
-// 	wb := badger.NewWriteBatch()
-// 	defer wb.Cancel()
-// 	err := wb.SetEntry(badger.NewEntry(key, value).WithMeta(0).WithTTL(time.Duration(ttl * time.Second.Nanoseconds())))
-// 	if err != nil {
-// 		log.Println("Failed to write data to cache.", "key", string(key), "value", string(value), "err", err)
-// 	}
-// 	err = wb.Flush()
-// 	if err != nil {
-// 		log.Println("Failed to flush data to cache.", "key", string(key), "value", string(value), "err", err)
-// 	}
-// }
-
-// func Get(key []byte) string {
-// 	var ival []byte
-// 	err := badger.View(func(txn *badger.Txn) error {
-// 		item, err := txn.Get(key)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		ival, err = item.ValueCopy(nil)
-// 		return err
-// 	})
-// 	if err != nil {
-// 		log.Println("Failed to read data from the cache.", "key", string(key), "error", err)
-// 	}
-// 	return string(ival)
-// }
-
-// func Has(key []byte) (bool, error) {
-// 	var exist bool = false
-// 	err := badger.View(func(txn *badger.Txn) error {
-// 		_, err := txn.Get(key)
-// 		if err != nil {
-// 			return err
-// 		} else {
-// 			exist = true
-// 		}
-// 		return err
-// 	})
-// 	// align with leveldb, if the key doesn't exist, leveldb returns nil
-// 	if strings.HasSuffix(err.Error(), "not found") {
-// 		err = nil
-// 	}
-// 	return exist, err
-// }
-
-// func Delete(key []byte) error {
-// 	wb := badger.NewWriteBatch()
-// 	defer wb.Cancel()
-// 	return wb.Delete(key)
-// }
-
-// func IteratorKeysAndValues() {
-
-// 	err := badger.View(func(txn *badger.Txn) error {
-// 		opts := badger.DefaultIteratorOptions
-// 		opts.PrefetchSize = 10
-// 		it := txn.NewIterator(opts)
-// 		defer it.Close()
-// 		for it.Rewind(); it.Valid(); it.Next() {
-// 			item := it.Item()
-// 			k := item.Key()
-// 			err := item.Value(func(v []byte) error {
-// 				fmt.Printf("key=%s, value=%s\n", k, v)
-// 				return nil
-// 			})
-// 			if err != nil {
-// 				return err
-// 			}
-// 		}
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		log.Println("Failed to iterator keys and values from the cache.", "error", err)
-// 	}
-// }
-
-// func IteratorKeys() {
-// 	err := badger.View(func(txn *badger.Txn) error {
-// 		opts := badger.DefaultIteratorOptions
-// 		opts.PrefetchValues = false
-// 		it := txn.NewIterator(opts)
-// 		defer it.Close()
-// 		for it.Rewind(); it.Valid(); it.Next() {
-// 			item := it.Item()
-// 			k := item.Key()
-// 			fmt.Printf("key=%s\n", k)
-// 		}
-// 		return nil
-// 	})
-
-// 	if err != nil {
-// 		log.Println("Failed to iterator keys from the cache.", "error", err)
-// 	}
-// }
-
-// func SeekWithPrefix(prefixStr string) {
-// 	err := badger.View(func(txn *badger.Txn) error {
-// 		it := txn.NewIterator(badger.DefaultIteratorOptions)
-// 		defer it.Close()
-// 		prefix := []byte(prefixStr)
-// 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-// 			item := it.Item()
-// 			k := item.Key()
-// 			err := item.Value(func(v []byte) error {
-// 				fmt.Printf("key=%s, value=%s\n", k, v)
-// 				return nil
-// 			})
-// 			if err != nil {
-// 				return err
-// 			}
-// 		}
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		log.Println("Failed to seek prefix from the cache.", "prefix", prefixStr, "error", err)
-// 	}
-// }
