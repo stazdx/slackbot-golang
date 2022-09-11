@@ -17,6 +17,11 @@ import (
 	"github.com/slack-go/slack/socketmode"
 )
 
+type Book struct {
+	Title   string
+	NoPages int
+}
+
 func main() {
 	godotenv.Load(".env")
 
@@ -33,7 +38,7 @@ func main() {
 
 	// Open a client connection
 	conn, err = http.NewConnection(http.ConnectionConfig{
-		Endpoints: []string{"https://5a812333269f.arangodb.cloud:8529/"},
+		Endpoints: []string{"https://a2e2cf48b8764484786bb598a3267c0e-1643361763.us-east-1.elb.amazonaws.com:8529/"},
 	})
 	if err != nil {
 		// Handle error
@@ -42,14 +47,14 @@ func main() {
 	// Client object
 	dbclient, err = driver.NewClient(driver.ClientConfig{
 		Connection:     conn,
-		Authentication: driver.BasicAuthentication("root", "wnbGnPpCXHwbP"),
+		Authentication: driver.BasicAuthentication("root", ""),
 	})
 	if err != nil {
 		// Handle error
 	}
 
 	// Open "examples_books" database
-	db, err3 := client.Database(nil, "examples_books")
+	db, err3 := dbclient.Database(nil, "peibot-slack")
 	if err3 != nil {
 		// Handle error
 	}
@@ -66,10 +71,12 @@ func main() {
 		NoPages: 257,
 	}
 
-	meta, err := col.CreateDocument(nil, book)
-	if err != nil {
-		// Handle error
-	}
+	fmt.Println(book)
+
+	// meta, err := col.CreateDocument(nil, book)
+	// if err != nil {
+	// 	// Handle error
+	// }
 	fmt.Printf("Created document in collection '%s' in database '%s'\n", col.Name(), db.Name())
 
 	socketClient := socketmode.New(
@@ -131,7 +138,7 @@ func main() {
 						continue
 					}
 
-					err := handleInteractionEvent(interaction, client, db)
+					err := handleInteractionEvent(interaction, client)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -216,7 +223,6 @@ func handleInteractionEvent(interaction slack.InteractionCallback, client *slack
 			log.Println("Action: ", action.Name)
 			switch action.Name {
 			case "actionPenalize":
-				return err2
 				log.Println("Penalizar!")
 			case "actionSave":
 				log.Println("Inocente!")
