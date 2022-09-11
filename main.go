@@ -64,13 +64,14 @@ func main() {
 		// Handle error
 	}
 
-	os.Exit(3)
-
 	// Open "books" collection
 	col, err2 := db.Collection(nil, "books")
 	if err2 != nil {
+		fmt.Println(err2)
 		// Handle error
 	}
+
+	os.Exit(3)
 
 	// Create document
 	book := Book{
