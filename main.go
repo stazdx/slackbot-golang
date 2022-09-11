@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
@@ -34,11 +35,14 @@ func main() {
 	var db driver.Database
 	var col driver.Collection
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	client := slack.New(token, slack.OptionDebug(true), slack.OptionAppLevelToken(appToken))
 
 	// Open a client connection
 	conn, err = http.NewConnection(http.ConnectionConfig{
 		Endpoints: []string{"https://a2e2cf48b8764484786bb598a3267c0e-1643361763.us-east-1.elb.amazonaws.com:8529/"},
+		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 	})
 	if err != nil {
 		// Handle error
@@ -54,10 +58,13 @@ func main() {
 	}
 
 	// Open "examples_books" database
-	db, err3 := dbclient.Database(nil, "peibot-slack")
+	db, err3 := dbclient.Database(ctx, "peibot-slack")
 	if err3 != nil {
+		fmt.Println(err3)
 		// Handle error
 	}
+
+	os.Exit(3)
 
 	// Open "books" collection
 	col, err2 := db.Collection(nil, "books")
@@ -77,6 +84,7 @@ func main() {
 	// if err != nil {
 	// 	// Handle error
 	// }
+	// fmt.Println(meta)
 	fmt.Printf("Created document in collection '%s' in database '%s'\n", col.Name(), db.Name())
 
 	socketClient := socketmode.New(
@@ -86,15 +94,11 @@ func main() {
 		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	defer cancel()
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	os.Exit(3)
 
 	go func(ctx context.Context, client *slack.Client, socketClient *socketmode.Client) {
 		for {
