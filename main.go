@@ -23,6 +23,15 @@ type Book struct {
 	NoPages int
 }
 
+type User struct {
+	Name     string `json:"name"`
+	Username string `json:"age"`
+	Role     string `json:"role"`
+	Email    string `json:"email"`
+	Hobbie   string `json:"hobbie"`
+	IsAdmin  bool   `json:"isAdmin"`
+}
+
 func main() {
 	godotenv.Load(".env")
 
@@ -34,6 +43,7 @@ func main() {
 	var conn driver.Connection
 	var db driver.Database
 	var col driver.Collection
+	var coll_exists bool
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -45,7 +55,7 @@ func main() {
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 	})
 	if err != nil {
-		// Handle error
+		log.Fatalf("Failed to create HTTP connection: %v", err)
 	}
 
 	// Client object
@@ -64,12 +74,67 @@ func main() {
 		// Handle error
 	}
 
-	// Open "books" collection
-	col, err2 := db.Collection(nil, "books")
-	if err2 != nil {
-		fmt.Println(err2)
-		// Handle error
+	// Create collection
+
+	coll_exists, err = db.CollectionExists(nil, "users")
+
+	if coll_exists {
+		fmt.Println("That collection exists already")
+		PrintCollection(db, "users")
+
+	} else {
+
+		var col driver.Collection
+		col, err = db.CreateCollection(nil, "users", nil)
+
+		if err != nil {
+			log.Fatalf("Failed to create collection: %v", err)
+		}
+
+		// Create documents
+		users := []User{
+			User{
+				Name:     "Staz",
+				Username: "stazdx",
+				Role:     "DevOps Lead",
+				Email:    "syanallalli@peigo.com.ec",
+				Hobbie:   "jugar futbol",
+				IsAdmin:  false,
+			},
+			User{
+				Name:     "Peter",
+				Username: "plescano",
+				Role:     "Architech Lead",
+				Email:    "plescano@peigo.com.ec",
+				Hobbie:   "coleccionar plantas",
+				IsAdmin:  false,
+			},
+			User{
+				Name:     "Adrian",
+				Username: "adri",
+				Role:     "Tech Lead",
+				Email:    "amontoya@peigo.com.ec",
+				Hobbie:   "viajar en su caminoneta",
+				IsAdmin:  false,
+			},
+		}
+		metas, errs, err := col.CreateDocuments(nil, users)
+
+		if err != nil {
+			log.Fatalf("Failed to create documents: %v", err)
+		} else if err := errs.FirstNonNil(); err != nil {
+			log.Fatalf("Failed to create documents: first error: %v", err)
+		}
+
+		fmt.Printf("Created documents with keys '%s' in collection '%s' in database '%s'\n", strings.Join(metas.Keys(), ","), col.Name(), db.Name())
 	}
+
+	// Open "books" collection
+	// col, err2 := db.Collection(nil, "books")
+	// if err2 != nil {
+	// 	fmt.Println(err2)
+	// 	// Handle error
+	// }
 
 	os.Exit(3)
 
@@ -353,4 +418,35 @@ func GetUserIDByStrings(str string, startS string, endS string) (result string, 
 	result = newS[:e]
 
 	return result, true
+}
+
+func PrintCollection(db driver.Database, name string) {
+
+	var err error
+	var cursor driver.Cursor
+
+	querystring := "FOR doc IN users LIMIT 10 RETURN doc"
+
+	cursor, err = db.Query(nil, querystring, nil)
+
+	if err != nil {
+		log.Fatalf("Query failed: %v", err)
+	}
+
+	defer cursor.Close()
+
+	for {
+		var doc User
+		var metadata driver.DocumentMeta
+
+		metadata, err = cursor.ReadDocument(nil, &doc)
+
+		if driver.IsNoMoreDocuments(err) {
+			break
+		} else if err != nil {
+			log.Fatalf("Doc returned: %v", err)
+		} else {
+			fmt.Print("Dot doc ", metadata, doc, "\n")
+		}
+	}
 }
